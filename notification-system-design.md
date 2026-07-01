@@ -73,3 +73,63 @@ Performance considerations.
 - Caching adds complexity and requires invalidation strategies.
 - Pagination improves performance but requires front-end handling.
 - Push model ensures instant updates but requires persistent connections and more server resources.
+
+
+## Stage 5
+Redesign the "Notify All" pseudocode.
+
+### Issues
+- Sequential loop → slow when many students.
+- No retry mechanism for failures.
+- Database writes and email sending tightly coupled.
+
+### Improved Design
+Use a **message queue** (RabbitMQ/Kafka) to decouple tasks and allow retries.
+
+### Pseudocode
+```python
+def notify_all(student_ids, message):
+    for student_id in student_ids:
+        enqueue_job("send_email", student_id, message)
+        enqueue_job("save_to_db", student_id, message)
+        enqueue_job("push_to_app", student_id, message)
+
+
+## Stage 6
+Priority Inbox implementation.
+
+### Requirement
+- Show top 10 unread notifications by priority (Placement > Result > Event) and recency.
+
+### Approach
+- Assign numeric priority values to each notification type.
+- Use a heap or sorting to select the top 10 based on priority and timestamp.
+- Ensure only unread notifications are considered.
+
+### Python Code
+```python
+from heapq import nlargest
+
+priority_map = {"Placement": 3, "Result": 2, "Event": 1}
+
+def fetch_notifications():
+    # Mocked notifications if API is protected
+    return [
+        {"id": 1, "notificationType": "Placement", "message": "Drive tomorrow", "isRead": False, "createdAt": "2026-07-01T09:00:00Z"},
+        {"id": 2, "notificationType": "Result", "message": "Exam results out", "isRead": False, "createdAt": "2026-07-01T08:00:00Z"},
+        {"id": 3, "notificationType": "Event", "message": "Workshop today", "isRead": False, "createdAt": "2026-07-01T07:00:00Z"},
+    ]
+
+def priority_score(notification):
+    return (priority_map.get(notification["notificationType"], 0), notification["createdAt"])
+
+def get_top_notifications(n=10):
+    notifications = fetch_notifications()
+    unread = [n for n in notifications if not n["isRead"]]
+    top = nlargest(n, unread, key=priority_score)
+    return top
+
+if __name__ == "__main__":
+    top10 = get_top_notifications()
+    for n in top10:
+        print(f"{n['notificationType']} - {n['message']} ({n['createdAt']})")
